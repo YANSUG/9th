@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bottom of the 9th - Provably Fair</title>
+    <title>Bottom of the 9th - Stable</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root { --grass: #1b5e20; --dirt: #5d4037; --line: rgba(255,255,255,0.7); --gold: #ffd700; --red: #ff5252; --blue: #2196f3; --dark: #0f0f0f; }
@@ -178,7 +178,7 @@
 </div>
 
 <script>
-    // 🔥 合約設定
+    // 🔥 合約設定 (確認無誤)
     const GAME_CONTRACT_ADDRESS = "0xDdDf7eBBcC42d933B1e2A43d5dD43d0BB5a63471"; 
     const BANKROLL_ADDRESS = "0x7A427604Ff8Ce728A60cF5cB247B30C0cE29188B";
 
@@ -191,7 +191,6 @@
     let userAddress = null;
     let curLang = 'zh'; 
 
-    // 機率 (HR:1, 3B:3, 2B:10, 1B:29, OUT:57)
     const PROBS = { HR: 1, TRIPLE: 3, DOUBLE: 10, SINGLE: 29, OUT: 57 };
     let currentRandom = BigInt(0);
     
@@ -200,7 +199,6 @@
 
     const basePos = { 0: { t: '100%', l: '100%' }, 1: { t: '0%', l: '100%' }, 2: { t: '0%', l: '0%' }, 3: { t: '100%', l: '0%' }, 4: { t: '120%', l: '50%' } };
 
-    // 🌟 多語言字典 (已移除具體人名)
     const TEXT = {
         zh: {
             pool: "累積獎池", connect: "連結", balance: "餘額", bet: "下注: 2 CRO",
@@ -214,7 +212,6 @@
             ruleDetail: "九局下半，無人出局，落後兩分。<br>分數超過 2 分即為獲勝！",
             payout: ["輸掉本金", "退還本金", "2倍 獎金", "5倍 獎金", "10倍 大獎"],
             status: { lose: "落後 {s} 分，逆轉吧！", tie: "✨ 平手！下一分直接贏！", win: "🏆 比賽結束！逆轉勝！" },
-            // 🔥 匿名化後的台灣鄉民梗
             comments: {
                 START: ["九局下半，落後兩分！關鍵時刻！", "教練臉色很難看，這局一定要得分！", "阿娘喂！現場球迷都站起來了！"],
                 SWING_POWER: ["大棒一揮！(等待結果...)", "想要一棒扛到停車場！", "用盡吃奶力氣揮棒！"],
@@ -271,7 +268,6 @@
 
     function toggleLang() {
         curLang = (curLang === 'zh') ? 'en' : 'zh';
-        // document.getElementById('langIcon').innerText = (curLang === 'zh') ? '繁中' : 'EN';
         refreshText();
     }
 
@@ -280,7 +276,6 @@
         modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
     }
 
-    // 點擊 Modal 外部關閉
     window.onclick = function(event) {
         const modal = document.getElementById('ruleModal');
         if (event.target == modal) {
@@ -293,8 +288,14 @@
         document.getElementById('jackpot').previousSibling.textContent = t.pool + ": ";
         document.getElementById('connectBtn').innerText = userAddress ? (userAddress.slice(0,6)+'...'+userAddress.slice(-4)) : ("🔗 " + t.connect);
         document.getElementById('txtBalance').innerText = t.balance;
-        document.getElementById('txtBetAmt').innerText = t.bet;
-        document.getElementById('txtWalletHint').innerText = userAddress ? "" : t.walletHint;
+        
+        // 確保元素存在再更新
+        const elBet = document.getElementById('txtBetAmt');
+        if(elBet) elBet.innerText = t.bet;
+        
+        const elHint = document.getElementById('txtWalletHint');
+        if(elHint) elHint.innerText = userAddress ? "" : t.walletHint;
+        
         document.getElementById('txtStrategy').innerText = t.strategy;
         
         document.getElementById('btnPower').innerHTML = `<span>${t.btnPower}</span>`;
@@ -304,7 +305,6 @@
         document.getElementById('casterTitle').innerText = t.caster;
         document.getElementById('gameStatus').innerText = isGameActive ? document.getElementById('gameStatus').innerText : t.waiting;
         
-        // Modal Text
         document.querySelector('#ruleModal h3').innerText = t.ruleTitle;
         document.getElementById('ruleDetail').innerHTML = t.ruleDetail;
 
@@ -323,8 +323,10 @@
             gameContract = new ethers.Contract(GAME_CONTRACT_ADDRESS, GAME_ABI, signer);
             
             document.getElementById('connectBtn').classList.add('connected');
-            document.getElementById('playBtn').disabled = false;
-            document.getElementById('txtWalletHint').style.display = 'none';
+            
+            // 啟用 Play 按鈕 (如果存在)
+            const playBtn = document.getElementById('playBtn');
+            if(playBtn) playBtn.disabled = false;
             
             refreshText(); 
             updateInfo();
@@ -343,15 +345,19 @@
         document.getElementById('jackpot').innerText = Math.floor(parseFloat(ethers.formatEther(poolBal))).toLocaleString();
     }
 
+    // 🌟 修復版 startGame
     async function startGame() {
         if(!gameContract) {
             alert("Please connect wallet first!");
             return;
         }
 
-        document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>Processing...<br><span style='font-size:0.8em; color:#aaa'>Confirm transaction in wallet</span></div>";
-        document.getElementById('lastSeedDisplay').style.display = 'none'; // 隱藏上局種子
+        // 隱藏上一局種子
+        const seedDisp = document.getElementById('lastSeedDisplay');
+        if(seedDisp) seedDisp.style.display = 'none';
 
+        document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>Processing...<br><span style='font-size:0.8em; color:#aaa'>Confirm transaction in wallet</span></div>";
+        
         try {
             const tx = await gameContract.play({ value: ethers.parseEther("2") });
             document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>⚾ Pitching...<br><span style='font-size:0.8em; color:#aaa'>Waiting for block confirmation</span></div>";
@@ -373,15 +379,13 @@
             isGameActive = true;
             document.getElementById('startScreen').style.display = 'none';
             
-            // 重置 Start Screen (準備下一局)
+            // 恢復畫面 (確保元素 ID 都在)
             setTimeout(() => {
                 const t = TEXT[curLang];
-                // 這裡會重新生成按鈕，同時插入種子碼顯示區
                 document.getElementById('startScreen').innerHTML = `
                     <div style="margin-bottom:10px; color:#aaa; font-weight:bold;" id="txtBetAmt">${t.bet}</div>
                     <button class="start-btn" id="playBtn" onclick="startGame()">PLAY BALL</button>
                     <div style="margin-top:5px; font-size:0.7em; color:#666;" id="txtWalletHint"></div>
-                    
                     <div id="lastSeedDisplay" style="display:none;" class="seed-box">
                         <span class="seed-label">Last Game Seed (For Verification):</span>
                         <span id="seedValue"></span>
@@ -397,11 +401,16 @@
             console.error(e);
             alert("Error: " + (e.reason || e.message));
             const t = TEXT[curLang];
+            // 恢復畫面 (含錯誤狀態修復)
             document.getElementById('startScreen').innerHTML = `
-                <div style="margin-bottom:10px; color:#aaa; font-weight:bold;">${t.bet}</div>
+                <div style="margin-bottom:10px; color:#aaa; font-weight:bold;" id="txtBetAmt">${t.bet}</div>
                 <button class="start-btn" id="playBtn" onclick="startGame()">PLAY BALL</button>
                 <div style="margin-top:20px; font-size:0.8em; color:#ccc;">Transaction Cancelled</div>
+                <div id="txtWalletHint" style="display:none"></div>
+                <div id="lastSeedDisplay" style="display:none;" class="seed-box"><span id="seedValue"></span></div>
             `;
+            // 如果錢包已連接，確保按鈕是可用的
+            if(userAddress) document.getElementById('playBtn').disabled = false;
         }
     }
 
@@ -601,3 +610,4 @@
 
 </body>
 </html>
+
