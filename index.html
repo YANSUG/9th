@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bottom of the 9th - 2 CRO Edition</title>
+    <title>Bottom of the 9th - Provably Fair</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root { --grass: #1b5e20; --dirt: #5d4037; --line: rgba(255,255,255,0.7); --gold: #ffd700; --red: #ff5252; --blue: #2196f3; --dark: #0f0f0f; }
@@ -11,15 +11,15 @@
         
         .container { max-width: 500px; margin: 0 auto; position: relative; padding-bottom: 30px; }
         
-        /* 頂部導航列 */
+        /* 頂部導航 */
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 0 5px; }
         .pool-box { font-size: 0.9em; color: var(--gold); border: 1px solid var(--gold); padding: 5px 12px; border-radius: 20px; background: rgba(255, 215, 0, 0.1); font-weight: bold; }
-        .right-tools { display: flex; gap: 10px; align-items: center; }
+        .right-tools { display: flex; gap: 8px; align-items: center; }
         
-        .connect-btn { background: #333; color: white; border: 1px solid #555; padding: 5px 10px; border-radius: 5px; font-size: 0.8em; cursor: pointer; transition: 0.2s; }
+        .connect-btn { background: #333; color: white; border: 1px solid #555; padding: 6px 10px; border-radius: 6px; font-size: 0.8em; cursor: pointer; transition: 0.2s; }
         .connect-btn.connected { background: #1b5e20; border-color: #4caf50; color: #fff; }
         
-        .lang-switch { cursor: pointer; font-size: 1.2em; border: 1px solid #555; padding: 2px 8px; border-radius: 5px; background: #222; }
+        .icon-btn { cursor: pointer; font-size: 1.1em; border: 1px solid #555; width: 32px; height: 32px; border-radius: 50%; background: #222; display: flex; justify-content: center; align-items: center; }
 
         .balance-row { text-align: right; font-size: 0.85em; color: #aaa; margin-bottom: 10px; padding-right: 5px; }
         .balance-val { color: #fff; font-weight: bold; font-size: 1.1em; }
@@ -75,11 +75,18 @@
         
         .status-bar { background: #222; color: #aaa; font-size: 0.95em; padding: 8px; margin-bottom: 15px; border-radius: 6px; min-height: 24px; font-weight: bold; letter-spacing: 0.5px; }
         
-        /* 賠率表 */
-        .payout-table { margin-top: 20px; width: 100%; font-size: 0.9em; color: #999; border-collapse: collapse; background: #1a1a1a; border-radius: 10px; border: 1px solid #333; overflow: hidden; }
-        .payout-table td { padding: 10px 12px; border-bottom: 1px solid #333; }
-        .payout-table tr:last-child td { border-bottom: none; }
-        .highlight { color: var(--gold); font-weight: bold; text-shadow: 0 0 5px rgba(255, 215, 0, 0.2); }
+        /* 規則 Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; justify-content: center; align-items: center; }
+        .modal-content { background: #222; padding: 20px; border-radius: 10px; border: 1px solid #444; width: 85%; max-width: 400px; text-align: center; position: relative; }
+        .close-btn { position: absolute; top: 10px; right: 15px; font-size: 1.5em; cursor: pointer; color: #aaa; }
+        
+        .payout-table { width: 100%; font-size: 0.9em; color: #ccc; border-collapse: collapse; margin-top: 10px; }
+        .payout-table td { padding: 8px; border-bottom: 1px solid #444; }
+        .highlight { color: var(--gold); font-weight: bold; }
+
+        /* 種子碼顯示區 */
+        .seed-box { margin-top: 20px; font-size: 0.75em; color: #666; background: rgba(0,0,0,0.5); padding: 8px; border-radius: 5px; width: 90%; word-break: break-all; }
+        .seed-label { color: #888; font-weight: bold; display: block; margin-bottom: 3px; }
     </style>
 </head>
 <body>
@@ -88,8 +95,9 @@
     <div class="top-bar">
         <div class="pool-box">POOL: <span id="jackpot">Loading...</span></div>
         <div class="right-tools">
-            <button id="connectBtn" class="connect-btn" onclick="connectWallet()">🔗 Connect Wallet</button>
-            <div class="lang-switch" onclick="toggleLang()">🌐 <span id="langIcon">EN</span></div>
+            <button id="connectBtn" class="connect-btn" onclick="connectWallet()">🔗 Connect</button>
+            <div class="icon-btn" onclick="toggleRule()">?</div>
+            <div class="icon-btn" onclick="toggleLang()" style="font-size:0.8em">🌐</div>
         </div>
     </div>
 
@@ -114,11 +122,13 @@
     <div class="field-container">
         <div class="start-overlay" id="startScreen">
             <div style="margin-bottom:10px; color:#aaa; font-weight:bold;" id="txtBetAmt">BET: 2 CRO</div>
-            
             <button class="start-btn" id="playBtn" onclick="startGame()" disabled>PLAY BALL</button>
-            
-            <div style="margin-top:20px; font-size:0.8em; color:#ccc;" id="txtRule">Rule: Score > 2 to Win</div>
             <div style="margin-top:5px; font-size:0.7em; color:#666;" id="txtWalletHint">(Please connect wallet first)</div>
+            
+            <div id="lastSeedDisplay" style="display:none;" class="seed-box">
+                <span class="seed-label">Last Game Seed (For Verification):</span>
+                <span id="seedValue"></span>
+            </div>
         </div>
 
         <div class="field">
@@ -147,14 +157,24 @@
             <span id="lblTake">Take</span>
         </button>
     </div>
+</div>
 
-    <table class="payout-table">
-        <tr id="row0"><td>0-1 Runs</td><td style="color:#666;">Loss</td></tr>
-        <tr id="row1"><td>2 Runs (Tie)</td><td>Refund</td></tr>
-        <tr id="row2"><td>3 Runs</td><td class="highlight">2x Payout</td></tr>
-        <tr id="row3"><td>4 Runs</td><td class="highlight" style="color:#ff9800">5x Payout</td></tr>
-        <tr id="row4"><td>5+ Runs</td><td class="highlight" style="color:#e040fb">10x Jackpot</td></tr>
-    </table>
+<div id="ruleModal" class="modal">
+    <div class="modal-content">
+        <span class="close-btn" onclick="toggleRule()">&times;</span>
+        <h3 style="color:var(--gold); margin-top:0;">Game Rules</h3>
+        <p id="ruleDetail" style="font-size:0.9em; line-height:1.5; color:#ccc;">
+            Bottom of the 9th, bases empty, trailing by 2 runs.<br>
+            Score more than 2 runs to win!
+        </p>
+        <table class="payout-table">
+            <tr><td>0-1 Runs</td><td style="color:#666;">Loss</td></tr>
+            <tr><td>2 Runs (Tie)</td><td>Refund</td></tr>
+            <tr><td>3 Runs</td><td class="highlight">2x Payout</td></tr>
+            <tr><td>4 Runs</td><td class="highlight" style="color:#ff9800">5x Payout</td></tr>
+            <tr><td>5+ Runs</td><td class="highlight" style="color:#e040fb">10x Jackpot</td></tr>
+        </table>
+    </div>
 </div>
 
 <script>
@@ -180,58 +200,53 @@
 
     const basePos = { 0: { t: '100%', l: '100%' }, 1: { t: '0%', l: '100%' }, 2: { t: '0%', l: '0%' }, 3: { t: '100%', l: '0%' }, 4: { t: '120%', l: '50%' } };
 
-    // 🌟 多語言字典 (含台灣經典金句)
+    // 🌟 多語言字典 (已移除具體人名)
     const TEXT = {
         zh: {
-            pool: "累積獎池", connect: "連結錢包", balance: "餘額", bet: "下注: 2 CRO",
-            rule: "規則：9局下半落後2分，逆轉即派彩", walletHint: "(請先連結錢包以開始)",
+            pool: "累積獎池", connect: "連結", balance: "餘額", bet: "下注: 2 CRO",
+            walletHint: "(請先連結錢包以開始)",
             strategy: "選擇打擊策略",
             btnPower: "全力揮棒", btnBunt: "短打/收打", btnTake: "謹慎選球",
             caster: "球評:",
             waiting: "等待比賽開始...",
             intro: "比賽即將開始！請按 PLAY BALL！",
+            ruleTitle: "遊戲規則",
+            ruleDetail: "九局下半，無人出局，落後兩分。<br>分數超過 2 分即為獲勝！",
             payout: ["輸掉本金", "退還本金", "2倍 獎金", "5倍 獎金", "10倍 大獎"],
             status: { lose: "落後 {s} 分，逆轉吧！", tie: "✨ 平手！下一分直接贏！", win: "🏆 比賽結束！逆轉勝！" },
-            // 🔥 台灣鄉民 & 經典主播語錄
+            // 🔥 匿名化後的台灣鄉民梗
             comments: {
                 START: ["九局下半，落後兩分！關鍵時刻！", "教練臉色很難看，這局一定要得分！", "阿娘喂！現場球迷都站起來了！"],
                 SWING_POWER: ["大棒一揮！(等待結果...)", "想要一棒扛到停車場！", "用盡吃奶力氣揮棒！"],
                 SWING_BUNT: ["擺出短棒...(等待結果)", "突然收打！", "想要點個內野安打！"],
                 SWING_TAKE: ["仔細選球...(等待結果)", "這球很接近...", "忍住不出棒！"],
-                
-                // 經典名言區
-                OUT: ["便當便當！揮棒落空！", "不可能！岳東華竟然...撲接到了！", "兩個字，大中計！", "打得軟趴趴，刺殺出局！"],
-                
+                OUT: ["便當便當！揮棒落空！", "不可能！野手竟然...撲接到了！", "兩個字，大中計！", "打得軟趴趴，刺殺出局！"],
                 DP: ["中了滿壘計！瓦解了！", "哎呀！雙殺打！最壞的結果！", "6-4-3 雙殺！攻勢瓦解！"],
-                
                 BB: ["選得好！四壞球保送！", "投手煮粥了，保送上壘！"],
                 HBP: ["觸身球！好痛！", "砸在身上！保送上一壘！"],
                 HIT: ["內野亂成一鍋粥了！", "安打啦！穿越安打！", "水喔！這球打得非常結實！"],
-                
                 DOUBLE: ["深遠的長打！二壘安打！", "球滾到全壘打牆邊！跑者衝啊！"],
                 TRIPLE: ["三壘安打！跑者跑得跟飛的一樣！", "球在角落處理很久！三壘安打！"],
-                
                 HR: ["這只是一個飛球......阿娘喂！飛出去了！", "變了心的女朋友！回不來了！紅不讓！", "來囉～ㄛㄛㄛㄛ～從東京打到北京！", "真的有天天過年的啦！全壘打！"],
-                
                 HR_BUNT: ["假點真打！投手被騙了！出去了！", "這顆失投球被逮中！全壘打！"],
                 HR_TAKE: ["球太甜了忍不住！轟出牆外！", "教練叫你等球你還打？但結果是全壘打！"],
-                
                 TIE: ["追平了！死裡逃生！", "現在雙方回到原點！"],
                 WIN: ["再見安打！比賽結束！今晚吃雞！", "逆轉勝！我們贏了！"],
                 LOSE: ["這場比賽...吃鍋貼了。", "留下殘壘，輸掉了比賽。"]
             }
         },
         en: {
-            pool: "PRIZE POOL", connect: "Connect Wallet", balance: "Balance", bet: "BET: 2 CRO",
-            rule: "Rule: Bottom 9th, Down by 2. Win to Earn.", walletHint: "(Connect wallet to play)",
+            pool: "PRIZE POOL", connect: "Connect", balance: "Balance", bet: "BET: 2 CRO",
+            walletHint: "(Connect wallet to play)",
             strategy: "Batting Strategy",
             btnPower: "Power Swing", btnBunt: "Bunt/Contact", btnTake: "Take Pitch",
             caster: "Broadcaster:",
             waiting: "Waiting for game...",
             intro: "Welcome to the ballpark! Click PLAY BALL!",
+            ruleTitle: "Game Rules",
+            ruleDetail: "Bottom of the 9th, bases empty, trailing by 2 runs.<br>Score more than 2 runs to win!",
             payout: ["Loss", "Refund (Push)", "2x Payout", "5x Payout", "10x Jackpot"],
             status: { lose: "Trailing by {s}, Rally time!", tie: "✨ TIE GAME! Next run wins!", win: "🏆 WALK-OFF WIN!" },
-            // MLB Style
             comments: {
                 START: ["Bottom of the 9th, down by 2. Rally caps on!", "Last chance for the home team!", "The crowd is on their feet!"],
                 SWING_POWER: ["Swinging for the fences!", "He's hacking at that one!", "Power swing!"],
@@ -256,8 +271,21 @@
 
     function toggleLang() {
         curLang = (curLang === 'zh') ? 'en' : 'zh';
-        document.getElementById('langIcon').innerText = (curLang === 'zh') ? '繁中' : 'EN';
+        // document.getElementById('langIcon').innerText = (curLang === 'zh') ? '繁中' : 'EN';
         refreshText();
+    }
+
+    function toggleRule() {
+        const modal = document.getElementById('ruleModal');
+        modal.style.display = (modal.style.display === 'flex') ? 'none' : 'flex';
+    }
+
+    // 點擊 Modal 外部關閉
+    window.onclick = function(event) {
+        const modal = document.getElementById('ruleModal');
+        if (event.target == modal) {
+            modal.style.display = "none";
+        }
     }
 
     function refreshText() {
@@ -266,7 +294,6 @@
         document.getElementById('connectBtn').innerText = userAddress ? (userAddress.slice(0,6)+'...'+userAddress.slice(-4)) : ("🔗 " + t.connect);
         document.getElementById('txtBalance').innerText = t.balance;
         document.getElementById('txtBetAmt').innerText = t.bet;
-        document.getElementById('txtRule').innerText = t.rule;
         document.getElementById('txtWalletHint').innerText = userAddress ? "" : t.walletHint;
         document.getElementById('txtStrategy').innerText = t.strategy;
         
@@ -277,6 +304,10 @@
         document.getElementById('casterTitle').innerText = t.caster;
         document.getElementById('gameStatus').innerText = isGameActive ? document.getElementById('gameStatus').innerText : t.waiting;
         
+        // Modal Text
+        document.querySelector('#ruleModal h3').innerText = t.ruleTitle;
+        document.getElementById('ruleDetail').innerHTML = t.ruleDetail;
+
         const rows = document.querySelectorAll('.payout-table tr td:nth-child(2)');
         t.payout.forEach((txt, i) => { if(rows[i]) rows[i].innerText = txt; });
 
@@ -319,9 +350,9 @@
         }
 
         document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>Processing...<br><span style='font-size:0.8em; color:#aaa'>Confirm transaction in wallet</span></div>";
-        
+        document.getElementById('lastSeedDisplay').style.display = 'none'; // 隱藏上局種子
+
         try {
-            // 🔥 確認這裡是 2 CRO
             const tx = await gameContract.play({ value: ethers.parseEther("2") });
             document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>⚾ Pitching...<br><span style='font-size:0.8em; color:#aaa'>Waiting for block confirmation</span></div>";
             
@@ -342,13 +373,19 @@
             isGameActive = true;
             document.getElementById('startScreen').style.display = 'none';
             
+            // 重置 Start Screen (準備下一局)
             setTimeout(() => {
                 const t = TEXT[curLang];
-                // 🔥 確認這裡重置後也是顯示 2 CRO
+                // 這裡會重新生成按鈕，同時插入種子碼顯示區
                 document.getElementById('startScreen').innerHTML = `
                     <div style="margin-bottom:10px; color:#aaa; font-weight:bold;" id="txtBetAmt">${t.bet}</div>
                     <button class="start-btn" id="playBtn" onclick="startGame()">PLAY BALL</button>
-                    <div style="margin-top:20px; font-size:0.8em; color:#ccc;" id="txtRule">${t.rule}</div>
+                    <div style="margin-top:5px; font-size:0.7em; color:#666;" id="txtWalletHint"></div>
+                    
+                    <div id="lastSeedDisplay" style="display:none;" class="seed-box">
+                        <span class="seed-label">Last Game Seed (For Verification):</span>
+                        <span id="seedValue"></span>
+                    </div>
                 `;
             }, 1000);
 
@@ -542,10 +579,19 @@
             let m = 2; if(homeScore === 4) m = 5; if(homeScore >= 5) m = 10;
             msg = (curLang === 'zh') ? `贏得 ${m}倍 獎金！` : `You Won ${m}x Payout!`;
         }
+        
         setTimeout(() => {
             alert(msg);
             updateInfo(); 
             document.getElementById('startScreen').style.display = 'flex';
+            
+            // 🔥 顯示種子碼供驗證
+            const seedDisp = document.getElementById('lastSeedDisplay');
+            const seedVal = document.getElementById('seedValue');
+            if(seedDisp && seedVal) {
+                seedVal.innerText = currentRandom.toString(); // 顯示原始種子
+                seedDisp.style.display = 'block';
+            }
         }, 500);
     }
     
