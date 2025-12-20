@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bottom of the 9th - Official Launch</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
+    <style>
+        :root { --grass: #1b5e20; --dirt: #5d4037; --line: rgba(255,255,255,0.7); --gold: #ffd700; --red: #ff5252; --blue: #2196f3; }
+        body { background: #0f0f0f; color: white; font-family: 'Arial', sans-serif; text-align: center; margin: 0; padding: 10px; overflow-x: hidden; touch-action: manipulation; user-select: none; }
+        .container { max-width: 500px; margin: 0 auto; position: relative; padding-bottom: 20px; }
+        
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 0.9em; }
+        .jackpot-box { color: var(--gold); font-weight: bold; border: 1px solid var(--gold); padding: 5px 10px; border-radius: 20px; background: rgba(255, 215, 0, 0.1); }
+        
+        .scoreboard { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.5fr; background: #000; border: 3px solid #444; border-radius: 8px; padding: 8px; margin-bottom: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.8); font-family: 'Courier New', monospace; }
+        .score-box { text-align: center; border-right: 1px solid #333; display: flex; flex-direction: column; justify-content: center; }
+        .score-box:last-child { border: none; }
+        .label { font-size: 0.6em; color: #888; margin-bottom: 2px; }
+        .value { font-size: 1.6em; font-weight: bold; color: #fff; }
+        .home-score { color: var(--gold); text-shadow: 0 0 8px var(--gold); }
+        .outs { color: var(--red); letter-spacing: 3px; }
+        
+        .commentary-box { background: #222; border-left: 4px solid var(--gold); color: #ddd; font-size: 1em; padding: 12px; margin-bottom: 15px; text-align: left; min-height: 55px; display: flex; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); border-radius: 0 5px 5px 0; transition: border-color 0.3s ease; }
+        .commentator-name { color: #888; font-weight: bold; margin-right: 8px; font-size: 0.8em; white-space: nowrap; }
+        #commentaryText { transition: opacity 0.3s ease-in-out; }
+        
+        .field-container { width: 100%; aspect-ratio: 1/1; position: relative; margin-bottom: 10px; }
+        .field { width: 100%; height: 100%; background: radial-gradient(circle at 50% 30%, #388e3c 0%, #1b5e20 80%); border-radius: 10px 10px 50% 50%; position: relative; overflow: hidden; border: 4px solid #555; box-shadow: inset 0 0 60px rgba(0,0,0,0.7); }
+        .infield { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 72%; height: 72%; background: var(--dirt); border-radius: 50% 50% 0 0; border-top: 2px dashed rgba(255,255,255,0.3); }
+        .diamond-wrap { position: absolute; bottom: 12%; left: 50%; width: 42%; height: 42%; transform: translateX(-50%) rotate(45deg); border: 2px solid var(--line); box-sizing: border-box; z-index: 5; }
+        .base { width: 24px; height: 24px; background: #ddd; position: absolute; transform: translate(-50%, -50%) rotate(-45deg); box-shadow: 2px 2px 4px rgba(0,0,0,0.5); transition: 0.3s; z-index: 10; }
+        .base.active { background: var(--gold); box-shadow: 0 0 15px var(--gold); border: 1px solid #fff; }
+        #base1 { top: 0; right: 0; } #base2 { top: 0; left: 0; } #base3 { bottom: 0; left: 0; } #baseH { bottom: 0; right: 0; background: #fff; clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); border-radius: 0; }
+        
+        .runner-dot { position: absolute; width: 16px; height: 16px; background: var(--gold); border: 2px solid white; border-radius: 50%; z-index: 20; box-shadow: 0 0 10px var(--gold); top: 0; left: 0; margin-top: -8px; margin-left: -8px; animation: runBase 0.6s linear forwards; }
+        @keyframes runBase { from { top: var(--startY); left: var(--startX); } to { top: var(--endY); left: var(--endX); } }
+        
+        .pitch-ball { width: 10px; height: 10px; background: white; border-radius: 50%; position: absolute; display: none; z-index: 15; left: 50%; bottom: 34%; transform: translateX(-50%); }
+        
+        .message { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%); font-size: 2.5em; font-weight: 900; color: white; text-shadow: 0 5px 0 #000, 0 0 20px rgba(255,255,255,1); display: none; z-index: 30; white-space: nowrap; pointer-events: none; font-style: italic; }
+        .hit-ani { animation: popIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0; } 50% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+        
+        .controls-label { font-size: 0.8em; color: #888; margin-bottom: 5px; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 5px; }
+        .btn-action { border: none; height: 50px; color: white; font-size: 0.9em; border-radius: 10px; cursor: pointer; font-weight: bold; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center; box-shadow: 0 4px 0 rgba(0,0,0,0.3); transition: 0.1s; }
+        .btn-action:active { transform: translateY(4px); box-shadow: none; }
+        .btn-action:disabled { background: #333 !important; color: #555; transform: translateY(4px); box-shadow: none; }
+        .btn-power { background: linear-gradient(to bottom, #d32f2f, #b71c1c); } 
+        .btn-bunt { background: linear-gradient(to bottom, #1976d2, #0d47a1); } 
+        .btn-take { background: linear-gradient(to bottom, #388e3c, #1b5e20); }
+        .btn-sub { font-size: 0.7em; opacity: 0.8; font-weight: normal; }
+        
+        .start-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 50; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; }
+        .start-btn { background: linear-gradient(to bottom, #ff9800, #f57c00); font-size: 1.8em; padding: 20px 40px; border-radius: 50px; color: #fff; border: 4px solid #fff; animation: pulse 1.5s infinite; cursor: pointer; font-weight: 900; text-transform: uppercase; box-shadow: 0 0 20px #ff9800; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        
+        .status-bar { background: #222; color: #aaa; font-size: 0.9em; padding: 5px; margin-bottom: 10px; border-radius: 5px; min-height: 24px; }
+        .payout-table { margin-top: 10px; width: 100%; font-size: 0.85em; color: #888; border-collapse: collapse; background: #1a1a1a; border-radius: 8px; border: 1px solid #333; }
+        .payout-table td { padding: 6px 10px; border-bottom: 1px solid #333; }
+        .highlight { color: var(--gold); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="top-bar">
+        <div class="jackpot-box">POOL: <span id="jackpot">Loading...</span></div>
+        <div id="walletAddr" style="font-size:0.8em; color:#aaa;">未連接錢包</div>
+    </div>
+    <div style="text-align: right; font-size: 0.8em; color: #aaa; margin-bottom: 5px;">
+        <span id="txtBalance">餘額</span>: <span id="balance">--</span> CRO
+    </div>
+
+    <div class="scoreboard">
+        <div class="score-box"> <span class="label">GUEST</span> <span class="value">2</span> </div>
+        <div class="score-box"> <span class="label">HOME</span> <span class="value home-score" id="homeScore">0</span> </div>
+        <div class="score-box"> <span class="label">INNING</span> <span class="value inning">9▼</span> </div>
+        <div class="score-box"> <span class="label">OUTS</span> <span class="value outs" id="outs">○○○</span> </div>
+    </div>
+
+    <div class="status-bar" id="gameStatus">等待比賽開始...</div>
+
+    <div class="commentary-box">
+        <span class="commentator-name" id="casterName">球評:</span>
+        <span id="commentaryText">請點擊 PLAY BALL 連接錢包並開始比賽！</span>
+    </div>
+
+    <div class="field-container">
+        <div class="start-overlay" id="startScreen">
+            <div style="margin-bottom:20px; color:#aaa;">下注: 10 CRO</div>
+            <div class="start-btn" onclick="startGame()">PLAY BALL</div>
+            <div style="margin-top:20px; font-size:0.8em; color:#666;">九局下半・落後兩分・逆轉就配彩</div>
+        </div>
+
+        <div class="field">
+            <div class="infield"></div>
+            <div class="mound"></div>
+            <div class="pitch-ball" id="pitchBall"></div>
+            <div class="message" id="msg">HOME RUN!</div>
+        </div>
+        <div class="diamond-wrap">
+            <div class="base" id="base2"></div>
+            <div class="base" id="base1"></div>
+            <div class="base" id="base3"></div>
+            <div class="base" id="baseH"></div>
+        </div>
+    </div>
+
+    <div class="controls-label">選擇打擊策略</div>
+    <div class="controls">
+        <button class="btn-action btn-power" id="btnPower" onclick="playTurn('POWER')" disabled>
+            <span>全力揮棒</span><span class="btn-sub">Power</span>
+        </button>
+        <button class="btn-action btn-bunt" id="btnBunt" onclick="playTurn('BUNT')" disabled>
+            <span>短打推進</span><span class="btn-sub">Bunt</span>
+        </button>
+        <button class="btn-action btn-take" id="btnTake" onclick="playTurn('TAKE')" disabled>
+            <span>謹慎選球</span><span class="btn-sub">Take</span>
+        </button>
+    </div>
+
+    <table class="payout-table">
+        <tr><td>0-1 分</td><td style="color:#666;">輸掉本金</td></tr>
+        <tr><td>2 分 (平手)</td><td>退還本金</td></tr>
+        <tr><td>3 分 (逆轉)</td><td class="highlight">2倍 獎金</td></tr>
+        <tr><td>4 分 (大逆轉)</td><td class="highlight" style="color:#ff9800">5倍 獎金</td></tr>
+        <tr><td>5+ 分 (滿貫)</td><td class="highlight" style="color:#e040fb">10倍 獎金</td></tr>
+    </table>
+</div>
+
+<script>
+    // 🔥 您的棒球遊戲合約
+    const GAME_CONTRACT_ADDRESS = "0xDdDf7eBBcC42d933B1e2A43d5dD43d0BB5a63471"; 
+    
+    // 🔥 您的金庫合約 (Bankroll)
+    const BANKROLL_ADDRESS = "0x7A427604Ff8Ce728A60cF5cB247B30C0cE29188B";
+
+    const GAME_ABI = [
+        "function play() external payable",
+        "event GameResult(address indexed player, uint256 payout, uint256 seed, uint256 finalScore)"
+    ];
+
+    let provider, signer, gameContract;
+    let userAddress;
+    
+    // 🔥 最終機率 (Contact Style): HR=1, 3B=3, 2B=10, 1B=29, OUT=57
+    const PROBS = { HR: 1, TRIPLE: 3, DOUBLE: 10, SINGLE: 29, OUT: 57 };
+    
+    let currentRandom = BigInt(0);
+    
+    // 遊戲狀態
+    let outs = 0; let homeScore = 0; let bases = [0, 0, 0]; 
+    let isGameActive = false; let isAnimating = false; let currentStrategy = "POWER"; 
+
+    const basePos = { 0: { t: '100%', l: '100%' }, 1: { t: '0%', l: '100%' }, 2: { t: '0%', l: '0%' }, 3: { t: '100%', l: '0%' }, 4: { t: '120%', l: '50%' } };
+
+    // 初始化 Web3
+    async function initWeb3() {
+        if (!window.ethereum) return alert("請安裝 DeFi Wallet 或 MetaMask");
+        try {
+            provider = new ethers.BrowserProvider(window.ethereum);
+            signer = await provider.getSigner();
+            userAddress = await signer.getAddress();
+            gameContract = new ethers.Contract(GAME_CONTRACT_ADDRESS, GAME_ABI, signer);
+            
+            document.getElementById('walletAddr').innerText = userAddress.slice(0,6) + "..." + userAddress.slice(-4);
+            updateInfo();
+            return true;
+        } catch (e) {
+            console.error(e);
+            return false;
+        }
+    }
+
+    async function updateInfo() {
+        if(!provider) return;
+        // 讀取玩家餘額
+        const bal = await provider.getBalance(userAddress);
+        document.getElementById('balance').innerText = parseFloat(ethers.formatEther(bal)).toFixed(2);
+        
+        // 讀取獎池 (金庫) 餘額
+        const poolBal = await provider.getBalance(BANKROLL_ADDRESS);
+        document.getElementById('jackpot').innerText = Math.floor(parseFloat(ethers.formatEther(poolBal))).toLocaleString();
+    }
+
+    async function startGame() {
+        if(!gameContract && !(await initWeb3())) return;
+
+        document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>正在發送交易...<br><span style='font-size:0.8em; color:#aaa'>支付 10 CRO</span></div>";
+        
+        try {
+            const tx = await gameContract.play({ value: ethers.parseEther("10") });
+            document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>⚾ 交易確認中...<br><span style='font-size:0.8em; color:#aaa'>比賽馬上開始</span></div>";
+            
+            const receipt = await tx.wait();
+            
+            let foundSeed = null;
+            receipt.logs.forEach(log => {
+                try {
+                    const parsed = gameContract.interface.parseLog(log);
+                    if(parsed.name === "GameResult") foundSeed = parsed.args.seed;
+                } catch(e){}
+            });
+
+            if(!foundSeed) throw new Error("無法讀取比賽結果");
+
+            currentRandom = foundSeed; 
+            
+            outs = 0; homeScore = 0; bases = [0, 0, 0];
+            isGameActive = true;
+            document.getElementById('startScreen').style.display = 'none';
+            setTimeout(() => {
+                document.getElementById('startScreen').innerHTML = `
+                    <div style="margin-bottom:20px; color:#aaa;">下注: 10 CRO</div>
+                    <div class="start-btn" onclick="startGame()">PLAY BALL</div>
+                    <div style="margin-top:20px; font-size:0.8em; color:#666;">九局下半・落後兩分・逆轉就配彩</div>`;
+            }, 1000);
+
+            enableBtns(true);
+            updateUI();
+            speak("START");
+
+        } catch (e) {
+            console.error(e);
+            alert("失敗: " + (e.reason || e.message));
+            document.getElementById('startScreen').innerHTML = `
+                <div style="margin-bottom:20px; color:#aaa;">下注: 10 CRO</div>
+                <div class="start-btn" onclick="startGame()">PLAY BALL</div>
+                <div style="margin-top:20px; font-size:0.8em; color:#666;">交易取消或失敗</div>`;
+        }
+    }
+
+    function nextRandom() {
+        const newHash = ethers.solidityPackedKeccak256(["uint256"], [currentRandom]);
+        currentRandom = BigInt(newHash);
+        return Number(currentRandom % 100n);
+    }
+
+    function enableBtns(enable) {
+        document.getElementById('btnPower').disabled = !enable;
+        document.getElementById('btnBunt').disabled = !enable;
+        document.getElementById('btnTake').disabled = !enable;
+    }
+
+    function playTurn(strategy) {
+        if (!isGameActive || isAnimating) return;
+        isAnimating = true; enableBtns(false); currentStrategy = strategy;
+
+        if(strategy === 'POWER') speak("SWING_POWER");
+        else if(strategy === 'BUNT') speak("SWING_BUNT");
+        else speak("SWING_TAKE");
+
+        const ball = document.getElementById('pitchBall');
+        ball.style.display = 'block'; ball.style.bottom = '34%'; ball.style.transition = 'none';
+        void ball.offsetWidth;
+        ball.style.transition = 'bottom 0.6s linear'; ball.style.bottom = '10%';
+
+        setTimeout(() => {
+            ball.style.display = 'none';
+            handleResult(getResult());
+        }, 800);
+    }
+
+    function getResult() {
+        const r = nextRandom();
+        let outcome = 'OUT'; let c = 0;
+        if(r < (c += PROBS.HR)) outcome = 'HR';
+        else if(r < (c += PROBS.TRIPLE)) outcome = '3B';
+        else if(r < (c += PROBS.DOUBLE)) outcome = '2B';
+        else if(r < (c += PROBS.SINGLE)) outcome = '1B';
+        else outcome = 'OUT';
+
+        if (outcome === 'OUT' && bases[0] === 1 && outs < 2) {
+             if (nextRandom() < 20) return 'DP'; 
+        }
+        if (outcome === '1B') {
+            const rt = nextRandom();
+            if (rt < 15) return 'BB'; 
+            if (rt < 20) return 'HBP';
+            return '1B'; 
+        }
+        return outcome;
+    }
+
+    function handleResult(type) {
+        if (type === 'OUT' || type === 'DP') {
+            let addOuts = 1; let text = "OUT!"; let color = "#ff5252";
+            if (type === 'DP') { addOuts = 2; text = "DOUBLE PLAY!"; speak("DP"); bases[0] = 0; } 
+            else { speak("OUT"); }
+            outs += addOuts; showHitText(text, color); updateUI();
+            setTimeout(() => {
+                isAnimating = false;
+                if (outs >= 3) endGame(false); else enableBtns(true);
+            }, 1200);
+        } else {
+            let hitBases = 1, text = "HIT!", color = "#fff";
+            if (type === 'BB') { text = "WALK"; speak("BB"); color="#4caf50"; }
+            else if (type === 'HBP') { text = "HBP"; speak("HBP"); color="#ff9800"; }
+            else if (type === '1B') { text = "HIT"; speak("HIT"); }
+            else if (type === '2B') { text="DOUBLE"; hitBases=2; speak("DOUBLE"); color="#4caf50"; }
+            else if (type === '3B') { text="TRIPLE"; hitBases=3; speak("TRIPLE"); color="#ffd700"; }
+            else if (type === 'HR') { 
+                text="HOME RUN"; hitBases=4; color="#e040fb";
+                if (currentStrategy === 'BUNT') speak("HR_BUNT");
+                else if (currentStrategy === 'TAKE') speak("HR_TAKE");
+                else speak("HR");
+            }
+            showHitText(text, color); advanceRunners(hitBases);
+        }
+    }
+
+    async function advanceRunners(hitBases) {
+        let movers = [];
+        if(bases[2]) movers.push({s:3}); if(bases[1]) movers.push({s:2}); if(bases[0]) movers.push({s:1}); movers.push({s:0});
+        let runs = 0; let nextBases = [0, 0, 0]; let promises = [];
+
+        movers.forEach(m => {
+            let e = m.s + hitBases;
+            promises.push(animateRunner(m.s, e));
+            if (e > 3) runs++; else nextBases[e-1] = 1;
+        });
+
+        await Promise.all(promises);
+        bases = nextBases; homeScore += runs; updateUI();
+        
+        if (homeScore > 2) { speak("WIN"); setTimeout(() => endGame(true), 1500); } 
+        else if (homeScore === 2) { speak("TIE"); isAnimating = false; enableBtns(true); } 
+        else { isAnimating = false; enableBtns(true); }
+    }
+
+    function animateRunner(start, end) {
+        return new Promise(resolve => {
+            const wrap = document.querySelector('.diamond-wrap');
+            const dot = document.createElement('div');
+            dot.className = 'runner-dot';
+            let tIdx = end > 3 ? 4 : end;
+            dot.style.setProperty('--startX', basePos[start].l); dot.style.setProperty('--startY', basePos[start].t);
+            dot.style.setProperty('--endX', basePos[tIdx].l); dot.style.setProperty('--endY', basePos[tIdx].t);
+            wrap.appendChild(dot); dot.addEventListener('animationend', () => { dot.remove(); resolve(); });
+        });
+    }
+
+    const COMMENTS = {
+        START: ["九局下半，落後兩分！逆轉的機會！", "關鍵時刻！教練沒換代打！", "滿場球迷都在期待逆轉！"],
+        SWING_POWER: ["大棒一揮！(等待結果...)", "想要一棒扛出去！", "用盡全身力氣揮棒！"],
+        SWING_BUNT: ["擺出短棒...(等待結果)", "突然收打！", "想要點個內野安打！"],
+        SWING_TAKE: ["仔細選球...(等待結果)", "這球很接近...", "忍住不出棒！"],
+        OUT: ["阿娘喂！被接殺出局！", "揮棒落空，三振！", "滾地球！刺殺出局！"],
+        DP: ["哎呀！雙殺打！最壞的結果！", "6-4-3 雙殺！攻勢瓦解！"],
+        BB: ["選得好！四壞球保送！", "投手控球不穩，保送上壘！"],
+        HBP: ["觸身球！好痛！", "砸在身上！保送上一壘！"],
+        HIT: ["安打！這是一支安打！", "穿越游擊防區！安打！"],
+        DOUBLE: ["深遠的長打！二壘安打！", "球滾到全壘打牆邊！"],
+        TRIPLE: ["三壘安打！跑者跑得飛快！", "球在角落處理很久！三壘安打！"],
+        HR: ["變了心的女朋友！回不來了！全壘打！", "再見全壘打！不可思議！", "這球飛到停車場去了！紅不讓！"],
+        HR_BUNT: ["擺出短棒...是顆紅中失投球！打者收棒轉強攻！出去了！", "假點真打！投手被騙了！這球直接飛上看台！"],
+        HR_TAKE: ["本來想等球...但這球太甜了！打者忍不住出棒！全壘打！", "教練下達等球指令，但打者硬是揮棒！結果是全壘打！"],
+        TIE: ["追平了！死裡逃生！"],
+        WIN: ["再見安打！比賽結束！", "我們贏了！絕地大反攻！"],
+        LOSE: ["比賽結束，反攻失敗...", "最後一個出局數，可惜了。"]
+    };
+
+    function speak(key) {
+        const lines = COMMENTS[key]; if(!lines) return;
+        const text = lines[Math.floor(Math.random() * lines.length)];
+        const box = document.getElementById('commentaryText');
+        box.style.opacity = 0;
+        const boxDiv = document.querySelector('.commentary-box');
+        if(key.includes('WIN') || key.includes('HR')) boxDiv.style.borderLeftColor = "#ff5252";
+        else if(key === 'TIE' || key === 'BB') boxDiv.style.borderLeftColor = "#4caf50";
+        else boxDiv.style.borderLeftColor = "#ffd700";
+        setTimeout(() => { box.innerText = text; box.style.opacity = 1; }, 300); 
+    }
+
+    function updateUI() {
+        document.getElementById('homeScore').innerText = homeScore;
+        document.getElementById('outs').innerHTML = "●".repeat(outs > 3 ? 3 : outs) + "<span style='color:#333'>○</span>".repeat(Math.max(0, 3-outs));
+        document.getElementById('base1').className = bases[0] ? 'base active' : 'base';
+        document.getElementById('base2').className = bases[1] ? 'base active' : 'base';
+        document.getElementById('base3').className = bases[2] ? 'base active' : 'base';
+        const status = document.getElementById('gameStatus');
+        if(homeScore < 2) { status.style.background = "#222"; status.style.color="#aaa"; status.innerText = `落後 ${2-homeScore} 分，目標：逆轉！`; } 
+        else if(homeScore === 2) { status.style.background = "#1b5e20"; status.style.color="#fff"; status.innerText = "✨ 平手！下一分直接勝利！"; } 
+        else { status.style.background = "linear-gradient(90deg, #ffd700, #ff9800)"; status.style.color="#000"; status.innerText = "🏆 比賽結束！逆轉勝！"; }
+        document.querySelectorAll('.payout-table tr').forEach(tr => tr.style.background = "");
+        if(homeScore >= 2) {
+             let idx = homeScore >= 5 ? 4 : (homeScore >= 4 ? 3 : (homeScore >= 3 ? 2 : 1));
+             let rows = document.querySelectorAll('.payout-table tr');
+             if(rows[idx]) rows[idx].style.background = "rgba(255, 215, 0, 0.2)";
+        }
+    }
+
+    function showHitText(text, color) {
+        const msg = document.getElementById('msg');
+        msg.innerText = text; msg.style.color = color;
+        msg.style.display = 'block';
+        msg.classList.remove('hit-ani');
+        void msg.offsetWidth;
+        msg.classList.add('hit-ani');
+    }
+
+    function endGame(isWin) {
+        isGameActive = false;
+        let msg = "";
+        if (!isWin) {
+            if (homeScore === 2) { speak("TIE"); msg = "平手！退還本金"; } 
+            else { speak("LOSE"); msg = "反攻失敗，輸掉本金"; }
+        } else {
+            speak("WIN");
+            let m = 2; if(homeScore === 4) m = 5; if(homeScore >= 5) m = 10;
+            msg = `贏得 ${m}倍 獎金！`;
+        }
+        setTimeout(() => {
+            alert(msg);
+            updateInfo(); 
+            document.getElementById('startScreen').style.display = 'flex';
+        }, 500);
+    }
+</script>
+
+</body>
+</html>
