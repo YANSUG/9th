@@ -52,7 +52,7 @@
         .pot-display { font-family: 'Mountains of Christmas', cursive; font-size: 3em; font-weight: bold; color: var(--xmas-gold); text-shadow: 0 0 15px rgba(248, 178, 41, 0.6); margin: 15px 0; }
         .timer-display { font-size: 1.8em; font-weight: bold; font-family: monospace; background: rgba(195, 15, 22, 0.6); padding: 5px 15px; border-radius: 10px; display: inline-block; margin: 10px 0; }
 
-        .btn { background: linear-gradient(to bottom, var(--xmas-red), #8a0b0f); color: var(--snow-white); border: 2px solid var(--xmas-gold); padding: 15px 30px; font-size: 1.3em; font-weight: bold; border-radius: 15px; cursor: pointer; width: 100%; transition: all 0.2s; box-shadow: 0 4px 0 #5c070a, 0 5px 10px rgba(0,0,0,0.4); text-shadow: 1px 1px 2px rgba(0,0,0,0.5); font-family: 'Mountains of Christmas', cursive; }
+        .btn { background: linear-gradient(to bottom, var(--xmas-red), #8a0b0f); color: var(--snow-white); border: 2px solid var(--xmas-gold); padding: 15px 30px; font-size: 1.3em; font-weight: bold; border-radius: 15px; cursor: pointer; width: 100%; transition: all 0.2s; box-shadow: 0 4px 0 #5c070a, 0 5px 10px rgba(0,0,0,0.4); text-shadow: 1px 1px 2px rgba(0,0,0,0.5); font-family: 'Mountains of Christmas', cursive; position: relative; z-index: 5; }
         .btn:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 6px 0 #5c070a, 0 7px 12px rgba(0,0,0,0.5); }
         .btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #5c070a, 0 3px 5px rgba(0,0,0,0.5); }
         .btn:disabled { background: #555; border-color: #333; cursor: not-allowed; box-shadow: none; transform: none; }
@@ -257,6 +257,8 @@
 </div>
 
 <script>
+    console.log("Script loaded successfully. Ethers version:", typeof ethers !== 'undefined' ? ethers.version : 'Not loaded');
+
     // --- Internationalization (i18n) ---
     const translations = {
         zh: {
@@ -270,7 +272,7 @@
             rule2: "💰 <b>資金去向：</b> 80% 進入這個巨大的禮物盒(獎池)，10% 立即分給之前的參與者，10% 由聖誕老人保管(開發與黑洞)。",
             rule3: "⏳ <b>生存法則：</b> 成為最後一個許願的人，當倒數計時歸零，你就能獨得禮物盒裡的 <span class='highlight'>80% 大獎</span>！",
             rule4: "🤝 <b>人人有獎：</b> 越早參與，你就能分到越多後來者的入場費(分紅)，隨時可提領！",
-            rule5: "🎄 <b>聖誕終極驚喜：</b> 如果到 <span class='highlight'>12月26日 (UTC 12:00)</span> 遊戲還沒結束，聖誕老人會強制打開禮物盒，將 <span class="highlight">50% 的獎金平分</span>給所有許過願的好孩子！",
+            rule5: "🎄 <b>聖誕終極驚喜：</b> 如果到 <span class='highlight'>12月26日 (UTC 12:00)</span> 遊戲還沒結束，聖誕老人會強制打開禮物盒，將 <span class='highlight'>50% 的獎金平分</span>給所有許過願的好孩子！",
             ruleFooter: "\"記得，每次許願後要休息 35 秒喔！\"",
             labelPot: "🎁 當前累積禮物盒 (Grand Prize Pot)",
             labelLeader: "👑 目前潛在得主 (Current Leader)",
@@ -519,7 +521,6 @@
             }
         });
 
-        // Re-check button state after lang change
         updateWishButtonState();
         
         const withdrawBtn = document.getElementById('withdraw-btn');
@@ -527,7 +528,6 @@
              withdrawBtn.innerText = translations[lang].btnWithdrawing;
         }
         
-        // Refresh Lists if loaded
         if (gameContract) {
              updateHistory(currentRoundId);
              if(userAddress) checkLegacyDividends(userAddress);
@@ -545,7 +545,7 @@
     var EXPLORER_URL = "https://cronoscan.com/address/" + CONTRACT_ADDR;
     var CHRISTMAS_TIMESTAMP_STATIC = 1766750400; 
 
-    // 只需要基本的 View 功能
+    // ABI
     var ABI = [
         "function wish() external payable",
         "function withdrawDividends(uint256 _rId) external",
@@ -559,13 +559,13 @@
         "function CHRISTMAS_END_TIMESTAMP() view returns (uint256)"
     ];
 
-    // 全域變數使用 var 避免 TDZ
+    // Variables
     var gameProvider = null;
     var gameSigner = null;
     var gameContract = null;
     var userAddress = null;
     var currentRoundId = 1;
-    var currentLeader = null; // Store leader locally
+    var currentLeader = null;
     var countdownInterval;
     var protocolInterval;
 
@@ -573,24 +573,36 @@
 
     startProtocolCountdown();
     
-    window.onload = function() {
-         if (typeof ethers === 'undefined') {
-             alert("⚠️ 錯誤：核心檔案加載失敗！\n請嘗試：\n1. 重新整理網頁\n2. 關閉 AdBlock\n3. 使用 Chrome/Edge 瀏覽器");
-         }
-    };
+    // Check Ethers on Load
+    window.addEventListener('load', function() {
+        if (typeof ethers === 'undefined') {
+            console.error("Ethers.js failed to load");
+            alert("⚠️ 錯誤：核心檔案加載失敗！\n請嘗試：\n1. 重新整理網頁\n2. 關閉 AdBlock");
+        }
+    });
 
     async function connectWallet() {
-        if (!window.ethereum) { alert(translations[currentLang].alertNoWallet); return; }
+        console.log("Connect Wallet Triggered");
+        if (!window.ethereum) { 
+            alert(translations[currentLang].alertNoWallet); 
+            return; 
+        }
         
         try {
-            if (typeof ethers === 'undefined') throw new Error("Ethers.js library not loaded.");
-
+            // Ethers v5 Provider
             gameProvider = new ethers.providers.Web3Provider(window.ethereum);
+            console.log("Provider created");
+            
             await gameProvider.send("eth_requestAccounts", []);
+            console.log("Accounts requested");
+            
             gameSigner = gameProvider.getSigner();
             userAddress = await gameSigner.getAddress();
+            console.log("Address:", userAddress);
+            
             gameContract = new ethers.Contract(CONTRACT_ADDR, ABI, gameSigner);
 
+            // UI Updates
             document.getElementById('connect-btn').classList.add('hidden');
             document.getElementById('wallet-info').classList.remove('hidden');
             document.getElementById('wallet-address').innerText = userAddress.slice(0,6) + "..." + userAddress.slice(-4);
@@ -605,10 +617,10 @@
             }
 
             refreshData();
-            setInterval(refreshData, 5000); // Reduce interval to 5s for better UX
+            setInterval(refreshData, 5000); 
 
         } catch (error) {
-            console.error(error);
+            console.error("Connection Error:", error);
             alert("連接失敗 (Connection Error):\n" + (error.reason || error.message || error));
         }
     }
@@ -624,21 +636,18 @@
             var christmasEnded = roundData[2];
             var endTimestamp = roundData[3].toNumber();
             var totalWishes = roundData[4].toNumber();
-            var leader = roundData[5]; // Current Winner Address
+            var leader = roundData[5]; 
             
-            currentLeader = leader; // Update Global Variable
+            currentLeader = leader; 
 
-            // Update UI for Pot & Leader
             document.getElementById('grand-pot').innerText = ethers.utils.formatEther(pot) + " CRO";
             
-            // Handle Leader Display
             var leaderDisplay = (leader === "0x0000000000000000000000000000000000000000") ? "---" : leader.slice(0, 6) + "..." + leader.slice(-4);
             if (userAddress && leader.toLowerCase() === userAddress.toLowerCase()) {
                 leaderDisplay += " (You 👑)";
             }
             document.getElementById('current-leader').innerText = leaderDisplay;
 
-            // Check if Button needs to change state
             updateWishButtonState();
 
             if (totalWishes < 100) {
@@ -668,14 +677,12 @@
                 document.getElementById('my-wishes').innerText = wisherInfo[1].toString();
             }
 
-            // 更新歷史與舊分紅
             updateHistory(currentRoundId);
             if (userAddress) checkLegacyDividends(userAddress);
 
         } catch (err) { console.error("Error fetching data:", err); }
     }
 
-    // --- Button State Logic (Prevention) ---
     function updateWishButtonState() {
         if (!userAddress || !currentLeader) return;
         
@@ -683,8 +690,6 @@
         if (currentLeader.toLowerCase() === userAddress.toLowerCase()) {
             btn.innerText = translations[currentLang].btnYouAreLeading;
             btn.classList.add('btn-leading');
-            // Optional: Disable if you want to strictly prevent
-            // btn.disabled = true; 
         } else {
             if (!btn.disabled || btn.innerText === translations[currentLang].btnYouAreLeading) {
                 btn.innerText = translations[currentLang].wishBtn;
@@ -693,7 +698,6 @@
         }
     }
 
-    // --- Legacy Dividends Logic ---
     async function checkLegacyDividends(user) {
         if (currentRoundId <= 1) return;
         
@@ -734,7 +738,6 @@
         } catch (err) { alert("Error claiming old dividends."); }
     }
 
-    // --- History Logic (Fixed Calculation: 12.8 CRO) ---
     async function updateHistory(currentId) {
         if (currentId <= 1) {
             document.getElementById('history-list').innerHTML = `<tr><td colspan="4" style="text-align:center; color:#888;">${translations[currentLang].noHistory}</td></tr>`;
@@ -753,14 +756,12 @@
                 var winnerDisplay = "---";
                 var resultTag = "";
                 
-                // 核心改動：精準計算贏家獨得獎金
-                // 20 CRO * 0.8 (入池) * 0.8 (贏家獨得) = 12.8 CRO
                 var calcPrize = (totalWishes * 12.8).toFixed(2) + " CRO";
 
                 if (xmasEnded) {
                     winnerDisplay = "🎅 Santa (All)";
                     resultTag = `<span class="protocol-tag">${translations[currentLang].tagProtocol}</span>`;
-                    calcPrize = "50% Pool"; // 聖誕協議
+                    calcPrize = "50% Pool"; 
                 } else if (ended) {
                     winnerDisplay = winner.slice(0, 6) + "..." + winner.slice(-4);
                     resultTag = `<span class="winner-tag">${translations[currentLang].tagWinner}</span>`;
@@ -820,7 +821,6 @@
     }
 
     async function makeWish() {
-        // Prevention check
         if (userAddress && currentLeader && userAddress.toLowerCase() === currentLeader.toLowerCase()) {
             if (!confirm("⚠️ 你目前已經是領先者了 (You are already winning)！\n再次許願只會延長時間，不會增加獲勝機率。\n確定要繼續嗎？")) {
                 return;
@@ -843,7 +843,6 @@
             alert(translations[currentLang].alertWishFail + msg);
         } finally {
             btn.disabled = false;
-            // Button state will be updated by refreshData()
         }
     }
 
@@ -886,5 +885,4 @@
 </script>
 </body>
 </html>
-
 
