@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Bottom of the 9th - Stable</title>
+    <title>Bottom of the 9th - Synced Fix</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.0/ethers.umd.min.js"></script>
     <style>
         :root { --grass: #1b5e20; --dirt: #5d4037; --line: rgba(255,255,255,0.7); --gold: #ffd700; --red: #ff5252; --blue: #2196f3; --dark: #0f0f0f; }
@@ -178,7 +178,7 @@
 </div>
 
 <script>
-    // 🔥 合約設定 (確認無誤)
+    // 🔥 合約設定
     const GAME_CONTRACT_ADDRESS = "0xDdDf7eBBcC42d933B1e2A43d5dD43d0BB5a63471"; 
     const BANKROLL_ADDRESS = "0x7A427604Ff8Ce728A60cF5cB247B30C0cE29188B";
 
@@ -289,7 +289,6 @@
         document.getElementById('connectBtn').innerText = userAddress ? (userAddress.slice(0,6)+'...'+userAddress.slice(-4)) : ("🔗 " + t.connect);
         document.getElementById('txtBalance').innerText = t.balance;
         
-        // 確保元素存在再更新
         const elBet = document.getElementById('txtBetAmt');
         if(elBet) elBet.innerText = t.bet;
         
@@ -324,7 +323,6 @@
             
             document.getElementById('connectBtn').classList.add('connected');
             
-            // 啟用 Play 按鈕 (如果存在)
             const playBtn = document.getElementById('playBtn');
             if(playBtn) playBtn.disabled = false;
             
@@ -345,14 +343,12 @@
         document.getElementById('jackpot').innerText = Math.floor(parseFloat(ethers.formatEther(poolBal))).toLocaleString();
     }
 
-    // 🌟 修復版 startGame
     async function startGame() {
         if(!gameContract) {
             alert("Please connect wallet first!");
             return;
         }
 
-        // 隱藏上一局種子
         const seedDisp = document.getElementById('lastSeedDisplay');
         if(seedDisp) seedDisp.style.display = 'none';
 
@@ -379,7 +375,6 @@
             isGameActive = true;
             document.getElementById('startScreen').style.display = 'none';
             
-            // 恢復畫面 (確保元素 ID 都在)
             setTimeout(() => {
                 const t = TEXT[curLang];
                 document.getElementById('startScreen').innerHTML = `
@@ -401,7 +396,6 @@
             console.error(e);
             alert("Error: " + (e.reason || e.message));
             const t = TEXT[curLang];
-            // 恢復畫面 (含錯誤狀態修復)
             document.getElementById('startScreen').innerHTML = `
                 <div style="margin-bottom:10px; color:#aaa; font-weight:bold;" id="txtBetAmt">${t.bet}</div>
                 <button class="start-btn" id="playBtn" onclick="startGame()">PLAY BALL</button>
@@ -409,7 +403,6 @@
                 <div id="txtWalletHint" style="display:none"></div>
                 <div id="lastSeedDisplay" style="display:none;" class="seed-box"><span id="seedValue"></span></div>
             `;
-            // 如果錢包已連接，確保按鈕是可用的
             if(userAddress) document.getElementById('playBtn').disabled = false;
         }
     }
@@ -445,6 +438,7 @@
         }, 800);
     }
 
+    // 🌟 核心修正：隨機數同步邏輯
     function getResult() {
         const r = nextRandom();
         let outcome = 'OUT'; let c = 0;
@@ -455,11 +449,14 @@
         else outcome = 'OUT';
 
         if (outcome === 'OUT' && bases[0] === 1 && outs < 2) {
-             if (nextRandom() < 20) return 'DP'; 
+             // 修正：使用同一個 r 判斷雙殺
+             if (r >= 88) return 'DP'; 
         }
         if (outcome === '1B') {
-            const rt = nextRandom();
-            if (rt < 15) return 'BB'; if (rt < 20) return 'HBP';
+            // 修正：使用 Math.random() 僅作顯示用途，不消耗種子
+            const flavor = Math.random() * 100;
+            if (flavor < 15) return 'BB'; 
+            if (flavor < 20) return 'HBP';
             return '1B'; 
         }
         return outcome;
@@ -594,20 +591,19 @@
             updateInfo(); 
             document.getElementById('startScreen').style.display = 'flex';
             
-            // 🔥 顯示種子碼供驗證
             const seedDisp = document.getElementById('lastSeedDisplay');
             const seedVal = document.getElementById('seedValue');
             if(seedDisp && seedVal) {
-                seedVal.innerText = currentRandom.toString(); // 顯示原始種子
+                seedVal.innerText = currentRandom.toString(); 
                 seedDisp.style.display = 'block';
             }
         }, 500);
     }
     
-    // 初始化語言
     toggleLang();
 </script>
 
 </body>
 </html>
+
 
