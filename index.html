@@ -357,7 +357,12 @@
         document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>Processing...<br><span style='font-size:0.8em; color:#aaa'>Confirm transaction in wallet</span></div>";
         
         try {
-            const tx = await gameContract.play({ value: ethers.parseEther("2") });
+            // 🔥 [FIX] 強制設定 Gas Limit 以解決 Internal JSON-RPC error
+            const tx = await gameContract.play({ 
+                value: ethers.parseEther("2"),
+                gasLimit: 300000 
+            });
+            
             document.getElementById('startScreen').innerHTML = "<div style='color:white; font-size:1.2em;'>⚾ Pitching...<br><span style='font-size:0.8em; color:#aaa'>Waiting for block confirmation</span></div>";
             
             const receipt = await tx.wait();
@@ -410,7 +415,7 @@
     }
 
     function nextRandom() {
-        // 修正：確保使用與 Solidity 相同的 Hash 算法
+        // [FIX] 確保使用與 Solidity 相同的 Hash 算法
         const newHash = ethers.solidityPackedKeccak256(["uint256"], [currentRandom]);
         currentRandom = BigInt(newHash);
         // 使用餘數 100 來取得 0-99 的數值
@@ -442,7 +447,7 @@
         }, 800);
     }
 
-    // 🔥 核心修正：移除 Math.random()，確保與鏈上同步
+    // 🔥 [FIX] 核心修正：移除 Math.random()，確保與鏈上同步
     function getResult() {
         const r = nextRandom();
         let outcome = 'OUT'; let c = 0;
@@ -613,4 +618,5 @@
 </script>
 </body>
 </html>
+
 
