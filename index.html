@@ -191,6 +191,8 @@
     let userAddress = null;
     let curLang = 'zh'; 
 
+    // 機率設定 (累積機率 0-99)
+    // HR: <1 (1%), 3B: <4 (3%), 2B: <14 (10%), 1B: <43 (29%), OUT: >=43
     const PROBS = { HR: 1, TRIPLE: 3, DOUBLE: 10, SINGLE: 29, OUT: 57 };
     let currentRandom = BigInt(0);
     
@@ -408,8 +410,10 @@
     }
 
     function nextRandom() {
+        // 修正：確保使用與 Solidity 相同的 Hash 算法
         const newHash = ethers.solidityPackedKeccak256(["uint256"], [currentRandom]);
         currentRandom = BigInt(newHash);
+        // 使用餘數 100 來取得 0-99 的數值
         return Number(currentRandom % 100n);
     }
 
@@ -438,27 +442,32 @@
         }, 800);
     }
 
-    // 🌟 核心修正：隨機數同步邏輯
+    // 🔥 核心修正：移除 Math.random()，確保與鏈上同步
     function getResult() {
         const r = nextRandom();
         let outcome = 'OUT'; let c = 0;
-        if(r < (c += PROBS.HR)) outcome = 'HR';
-        else if(r < (c += PROBS.TRIPLE)) outcome = '3B';
-        else if(r < (c += PROBS.DOUBLE)) outcome = '2B';
-        else if(r < (c += PROBS.SINGLE)) outcome = '1B';
-        else outcome = 'OUT';
+
+        // 機率累積檢查 (0-99)
+        if(r < (c += PROBS.HR)) outcome = 'HR';          // 0
+        else if(r < (c += PROBS.TRIPLE)) outcome = '3B'; // 1-3
+        else if(r < (c += PROBS.DOUBLE)) outcome = '2B'; // 4-13
+        else if(r < (c += PROBS.SINGLE)) {               // 14-42
+            // 將一壘安打區間細分為 BB/HBP/1B，使用同一個 r，保證決定性
+            // 區間大小 29 (14到42)
+            // 假設定義: r=14~17 (4個) 為 BB, r=18 (1個) 為 HBP, 其餘為 1B
+            // 這樣在區塊鏈邏輯中它們都是 "Single" (上一壘)，但前端顯示有變化
+            if (r >= 14 && r <= 17) outcome = 'BB';
+            else if (r === 18) outcome = 'HBP';
+            else outcome = '1B';
+        }
+        else outcome = 'OUT'; // 43-99
 
         if (outcome === 'OUT' && bases[0] === 1 && outs < 2) {
-             // 修正：使用同一個 r 判斷雙殺
+             // 雙殺檢查：使用同一個 r (範圍 43-99)
+             // 假設合約也是用同樣的閾值
              if (r >= 88) return 'DP'; 
         }
-        if (outcome === '1B') {
-            // 修正：使用 Math.random() 僅作顯示用途，不消耗種子
-            const flavor = Math.random() * 100;
-            if (flavor < 15) return 'BB'; 
-            if (flavor < 20) return 'HBP';
-            return '1B'; 
-        }
+        
         return outcome;
     }
 
@@ -602,6 +611,5 @@
     
     toggleLang();
 </script>
-
 </body>
 </html>
